@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Expense Tracker API Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f7;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #4568DC;
+        }
+        .test-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            background-color: #4568DC;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #3457CB;
+        }
+        pre {
+            background-color: #f4f4f4;
+            padding: 10px;
+            overflow: auto;
+            border-radius: 5px;
+        }
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .endpoints {
+            margin-top: 20px;
+        }
+        .endpoint {
+            margin-bottom: 10px;
+            padding: 5px;
+            background-color: #f4f4f4;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Expense Tracker API Test</h1>
+        <p>Use this page to test your API endpoints and diagnose connection issues.</p>
+        
+        <div class="test-section">
+            <h2>Test API Connection</h2>
+            <p>Base URL: <span id="base-url"></span></p>
+            <button onclick="testConnection()">Test Connection</button>
+            <div id="connection-status"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>Get All Expenses</h2>
+            <button onclick="getAllExpenses()">Fetch Expenses</button>
+            <div id="get-status"></div>
+            <pre id="get-result"></pre>
+        </div>
+        
+        <div class="test-section">
+            <h2>Create Test Expense</h2>
+            <button onclick="createTestExpense()">Create Expense</button>
+            <div id="post-status"></div>
+            <pre id="post-result"></pre>
+        </div>
+        
+        <div class="endpoints">
+            <h2>Available Endpoints</h2>
+            <div class="endpoint">GET /api/expenses - Get all expenses</div>
+            <div class="endpoint">GET /api/expenses/{id} - Get a specific expense</div>
+            <div class="endpoint">POST /api/expenses - Create a new expense</div>
+            <div class="endpoint">PUT /api/expenses/{id} - Update an expense</div>
+            <div class="endpoint">DELETE /api/expenses/{id} - Delete an expense</div>
+            <div class="endpoint">GET /api/expenses/byDate?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD - Get expenses by date range</div>
+            <div class="endpoint">GET /api/expenses/byCategory?category=CATEGORY - Get expenses by category</div>
+            <div class="endpoint">GET /api/expenses/summary?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD - Get expense summary</div>
+        </div>
+    </div>
+    
+    <script>
+        // API base URL
+        const API_URL = 'http://localhost:8080/api';
+        
+        // Display the base URL
+        document.getElementById('base-url').textContent = API_URL;
+        
+        // Test connection to API
+        async function testConnection() {
+            const statusElement = document.getElementById('connection-status');
+            statusElement.innerHTML = 'Testing connection...';
+            statusElement.className = 'status';
+            
+            try {
+                const startTime = new Date().getTime();
+                const response = await fetch(`${API_URL}/expenses`, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' }
+                });
+                const endTime = new Date().getTime();
+                
+                if (response.ok) {
+                    statusElement.innerHTML = `Connection successful! Server responded in ${endTime - startTime}ms with status ${response.status}`;
+                    statusElement.className = 'status success';
+                } else {
+                    statusElement.innerHTML = `Connection failed with status: ${response.status} ${response.statusText}`;
+                    statusElement.className = 'status error';
+                }
+            } catch (error) {
+                statusElement.innerHTML = `Connection error: ${error.message}. Make sure your backend server is running and accessible.`;
+                statusElement.className = 'status error';
+            }
+        }
+        
+        // Fetch all expenses
+        async function getAllExpenses() {
+            const statusElement = document.getElementById('get-status');
+            const resultElement = document.getElementById('get-result');
+            
+            statusElement.innerHTML = 'Fetching expenses...';
+            statusElement.className = 'status';
+            resultElement.textContent = '';
+            
+            try {
+                const response = await fetch(`${API_URL}/expenses`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    statusElement.innerHTML = `Successfully fetched ${data.length} expenses!`;
+                    statusElement.className = 'status success';
+                    resultElement.textContent = JSON.stringify(data, null, 2);
+                } else {
+                    statusElement.innerHTML = `Failed with status: ${response.status} ${response.statusText}`;
+                    statusElement.className = 'status error';
+                    resultElement.textContent = JSON.stringify(data, null, 2);
+                }
+            } catch (error) {
+                statusElement.innerHTML = `Error: ${error.message}`;
+                statusElement.className = 'status error';
+            }
+        }
+        
+        // Create a test expense
+        async function createTestExpense() {
+            const statusElement = document.getElementById('post-status');
+            const resultElement = document.getElementById('post-result');
+            
+            statusElement.innerHTML = 'Creating test expense...';
+            statusElement.className = 'status';
+            resultElement.textContent = '';
+            
+            const testExpense = {
+                title: 'Test Expense',
+                amount: 99.99,
+                category: 'Test',
+                date: new Date().toISOString().split('T')[0],
+                notes: 'This is a test expense created from the API test tool'
+            };
+            
+            try {
+                const response = await fetch(`${API_URL}/expenses`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(testExpense)
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    statusElement.innerHTML = 'Test expense created successfully!';
+                    statusElement.className = 'status success';
+                    resultElement.textContent = JSON.stringify(data, null, 2);
+                } else {
+                    statusElement.innerHTML = `Failed with status: ${response.status} ${response.statusText}`;
+                    statusElement.className = 'status error';
+                    resultElement.textContent = JSON.stringify(data, null, 2);
+                }
+            } catch (error) {
+                statusElement.innerHTML = `Error: ${error.message}`;
+                statusElement.className = 'status error';
+            }
+        }
+    </script>
+</body>
+</html>
