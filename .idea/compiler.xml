@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <annotationProcessing>
+      <profile name="Annotation profile for expensetracker" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <processorPath useClasspath="false">
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.38/lombok-1.18.38.jar" />
+        </processorPath>
+        <module name="expensetracker" />
+      </profile>
+    </annotationProcessing>
+    <bytecodeTargetLevel>
+      <module name="gradle-plugin-root.react-native-gradle-plugin" target="11" />
+      <module name="gradle-plugin-root.react-native-gradle-plugin.main" target="11" />
+      <module name="gradle-plugin-root.react-native-gradle-plugin.test" target="11" />
+      <module name="gradle-plugin-root.settings-plugin" target="11" />
+      <module name="gradle-plugin-root.settings-plugin.main" target="11" />
+      <module name="gradle-plugin-root.settings-plugin.test" target="11" />
+      <module name="gradle-plugin-root.shared" target="11" />
+      <module name="gradle-plugin-root.shared-testutil" target="11" />
+      <module name="gradle-plugin-root.shared-testutil.main" target="11" />
+      <module name="gradle-plugin-root.shared-testutil.test" target="11" />
+      <module name="gradle-plugin-root.shared.main" target="11" />
+      <module name="gradle-plugin-root.shared.test" target="11" />
+    </bytecodeTargetLevel>
+  </component>
+  <component name="JavacSettings">
+    <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="expensetracker" options="-parameters" />
+    </option>
+  </component>
+</project>
