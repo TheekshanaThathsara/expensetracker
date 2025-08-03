@@ -524,6 +524,78 @@ export default function ReportsScreen() {
     return result;
   };
 
+  // Get the primary color for the highest amount range in current data
+  const getChartPrimaryColor = () => {
+    const chartData = getBarChartData();
+    const dataValues = chartData.datasets[0].data;
+    
+    // For mixed amounts, use a gradient or the most dominant color
+    const colorCounts = { green: 0, yellow: 0, red: 0 };
+    
+    dataValues.forEach(amount => {
+      if (amount > 1000) {
+        colorCounts.red++;
+      } else if (amount >= 500) {
+        colorCounts.yellow++;
+      } else if (amount > 0) {
+        colorCounts.green++;
+      }
+    });
+    
+    // Return the most common color, or red if there's a tie (highest priority)
+    if (colorCounts.red > 0) {
+      return '#F44336'; // Solid Red
+    } else if (colorCounts.yellow > 0) {
+      return '#FFC107'; // Solid Yellow 
+    } else if (colorCounts.green > 0) {
+      return '#4CAF50'; // Solid Green
+    } else {
+      return '#4568DC'; // Solid Default blue
+    }
+  };
+
+  // Get multiple datasets for different color ranges
+  const getColoredBarChartData = () => {
+    const baseData = getBarChartData();
+    const allAmounts = baseData.datasets[0].data;
+    
+    // Separate data into color ranges
+    const yellowData = allAmounts.map(amount => amount > 0 && amount < 500 ? amount : 0);
+    const orangeData = allAmounts.map(amount => amount >= 500 && amount <= 1000 ? amount : 0);
+    const redData = allAmounts.map(amount => amount > 1000 ? amount : 0);
+    
+    return {
+      labels: baseData.labels,
+      datasets: [
+        {
+          data: yellowData,
+          color: () => '#4CAF50', // Green
+        },
+        {
+          data: orangeData,
+          color: () => '#FFC107', // Yellow
+        },
+        {
+          data: redData,
+          color: () => '#F44336', // Red
+        }
+      ]
+    };
+  };
+
+  // Helper function to get bar color based on expense amount
+  const getBarColor = (amount: number) => {
+    if (amount === 0) {
+      return '#E0E0E0'; // Light gray for zero amounts
+    } else if (amount < 500) {
+      return '#4CAF50'; // Green for < LKR 500
+    } else if (amount >= 500 && amount <= 1000) {
+      return '#FFC107'; // Yellow for LKR 500-1000
+    } else {
+      return '#F44336'; // Red for > LKR 1000
+    }
+  };
+
   const navigateWeek = (direction: 'prev' | 'next') => {
     console.log('=== navigateWeek DEBUG ===');
     console.log('Current week start before:', currentWeekStart);
@@ -746,7 +818,24 @@ export default function ReportsScreen() {
                   </Text>
                   <View style={styles.chartContainer}>
                     <BarChart
-                      data={getBarChartData()}
+                      data={{
+                        labels: getBarChartData().labels,
+                        datasets: [{
+                          data: getBarChartData().datasets[0].data,
+                          colors: getBarChartData().datasets[0].data.map((amount) => {
+                            // Return solid color based on amount range
+                            if (amount === 0) {
+                              return () => '#E0E0E0'; // Light gray for zero amounts
+                            } else if (amount < 500) {
+                              return () => '#4CAF50'; // Solid Green for < LKR 500
+                            } else if (amount >= 500 && amount <= 1000) {
+                              return () => '#FFC107'; // Solid Yellow for LKR 500-1000
+                            } else {
+                              return () => '#F44336'; // Solid Red for > LKR 1000
+                            }
+                          })
+                        }]
+                      }}
                       width={screenWidth - 64}
                       height={220}
                       yAxisLabel="LKR"
@@ -756,12 +845,18 @@ export default function ReportsScreen() {
                         backgroundGradientFrom: '#ffffff',
                         backgroundGradientTo: '#ffffff',
                         decimalPlaces: 0,
-                        color: (opacity = 1) => `rgba(69, 104, 220, ${opacity})`,
-                        labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+                        color: (opacity = 1) => '#4568DC', // Default color (will be overridden by individual bar colors)
+                        labelColor: (opacity = 1) => '#333333',
                         style: {
                           borderRadius: 16,
                         },
-                        barPercentage: 0.6,
+                        barPercentage: 0.7,
+                        fillShadowGradientOpacity: 1, // Completely solid bars
+                        propsForBackgroundLines: {
+                          strokeWidth: 1,
+                          stroke: '#E0E0E0',
+                          strokeOpacity: 0.3,
+                        },
                       }}
                       style={{
                         marginVertical: 8,
@@ -769,12 +864,56 @@ export default function ReportsScreen() {
                       }}
                       showValuesOnTopOfBars={true}
                       fromZero={true}
+                      withCustomBarColorFromData={true}
                     />
+                    
+                    {/* Custom expense breakdown below chart */}
+                    <View style={styles.expenseBreakdown}>
+                      {getBarChartData().datasets[0].data.map((amount, index) => {
+                        const label = getBarChartData().labels[index];
+                        if (amount > 0) {
+                          return (
+                            <View key={index} style={styles.expenseItem}>
+                              <Text style={styles.expenseDay}>{label}</Text>
+                              <View style={styles.expenseAmount}>
+                                <View 
+                                  style={[
+                                    styles.expenseColorDot, 
+                                    { backgroundColor: getBarColor(amount) }
+                                  ]} 
+                                />
+                                <Text style={[styles.expenseText, { color: getBarColor(amount) }]}>
+                                  {formatCurrency(amount)}
+                                </Text>
+                              </View>
+                            </View>
+                          );
+                        }
+                        return null;
+                      })}
+                    </View>
+                    
                     {dailyExpenses.length === 0 && (
                       <View style={styles.noDataContainer}>
                         <Text style={styles.noDataText}>No expenses found for the selected period</Text>
                       </View>
                     )}
+                    
+                    {/* Color Legend */}
+                    <View style={styles.colorLegend}>
+                      <View style={styles.legendItem}>
+                        <View style={[styles.legendColor, { backgroundColor: '#FFC107' }]} />
+                        <Text style={styles.legendText}>{'< LKR 500'}</Text>
+                      </View>
+                      <View style={styles.legendItem}>
+                        <View style={[styles.legendColor, { backgroundColor: '#FF9800' }]} />
+                        <Text style={styles.legendText}>LKR 500-1000</Text>
+                      </View>
+                      <View style={styles.legendItem}>
+                        <View style={[styles.legendColor, { backgroundColor: '#F44336' }]} />
+                        <Text style={styles.legendText}>{'> LKR 1000'}</Text>
+                      </View>
+                    </View>
                   </View>
                 </Card.Content>
               </Card>
@@ -942,6 +1081,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginVertical: 10,
   },
+  stackedBarContainer: {
+    position: 'relative',
+    height: 220,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   noDataContainer: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -1026,5 +1171,77 @@ const styles = StyleSheet.create({
     marginTop: 10,
     paddingVertical: 8,
     borderRadius: 25,
+  },
+  colorLegend: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 15,
+    gap: 20,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  legendColor: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 5,
+  },
+  legendText: {
+    fontSize: 12,
+    color: '#666',
+  },
+  colorIndicators: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    marginTop: -40,
+    marginBottom: 20,
+    paddingHorizontal: 40,
+  },
+  colorIndicatorContainer: {
+    alignItems: 'center',
+  },
+  colorIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginBottom: 2,
+  },
+  amountText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  expenseBreakdown: {
+    marginTop: 10,
+    paddingHorizontal: 10,
+  },
+  expenseItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  expenseDay: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333',
+  },
+  expenseAmount: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  expenseColorDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  expenseText: {
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });
