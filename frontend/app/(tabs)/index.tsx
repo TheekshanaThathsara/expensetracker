@@ -1,13 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, FlatList, View, RefreshControl, Dimensions, StatusBar } from 'react-native';
-import { format } from 'date-fns';
-import { useRouter } from 'expo-router';
-import { Button, Card, Text, IconButton, Chip, ActivityIndicator, FAB, useTheme, Searchbar, Divider } from 'react-native-paper';
-import { LinearGradient } from 'expo-linear-gradient';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
-import { api, Expense } from '@/services/api';
 import { CATEGORY_COLORS } from '@/constants/ExpenseCategories';
+import { api, Expense } from '@/services/api';
+import { format } from 'date-fns';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { Dimensions, FlatList, RefreshControl, StatusBar, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Button, Card, Chip, Divider, FAB, IconButton, Searchbar, Text, useTheme } from 'react-native-paper';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -24,6 +22,7 @@ export default function ExpensesScreen() {
     try {
       setLoading(true);
       const data = await api.getExpenses();
+      console.log('Loaded expenses:', data); // Debug log
       setExpenses(data);
       setFilteredExpenses(data);
     } catch (error) {
@@ -42,6 +41,13 @@ export default function ExpensesScreen() {
   useEffect(() => {
     loadExpenses();
   }, []);
+
+  // Reload expenses when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      loadExpenses();
+    }, [])
+  );
   
   // Filter expenses based on search query
   useEffect(() => {
@@ -69,9 +75,9 @@ export default function ExpensesScreen() {
   };
 
   const formatCurrency = (amount: number) => {
-    return amount.toLocaleString('en-US', {
+    return amount.toLocaleString('en-LK', {
       style: 'currency',
-      currency: 'USD'
+      currency: 'LKR'   // Currency formatting
     });
   };
   

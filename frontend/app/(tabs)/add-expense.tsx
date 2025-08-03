@@ -1,16 +1,14 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, ScrollView, StatusBar, TouchableOpacity } from 'react-native';
-import { useRouter } from 'expo-router';
-import { Button, TextInput, HelperText, Menu, Divider, ActivityIndicator, Card, IconButton, useTheme, Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { format } from 'date-fns';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import React, { useState } from 'react';
+import { Modal, Platform, ScrollView, StatusBar, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Button, Card, Divider, HelperText, IconButton, Text, TextInput, useTheme } from 'react-native-paper';
 
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+import { CATEGORY_COLORS, CATEGORY_ICONS, EXPENSE_CATEGORIES } from '@/constants/ExpenseCategories';
 import { api } from '@/services/api';
-import { EXPENSE_CATEGORIES, CATEGORY_COLORS, CATEGORY_ICONS } from '@/constants/ExpenseCategories';
 
 export default function AddExpenseScreen() {
   const router = useRouter();
@@ -87,10 +85,27 @@ export default function AddExpenseScreen() {
   };
 
   const onDateChange = (event: any, selectedDate?: Date) => {
-    setShowDatePicker(false);
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
     if (selectedDate) {
       setDate(selectedDate);
     }
+  };
+
+  // Handle calendar date selection
+  const onCalendarDateSelect = (day: any) => {
+    const selectedDate = new Date(day.dateString);
+    setDate(selectedDate);
+    setShowDatePicker(false);
+  };
+
+  const confirmDate = () => {
+    setShowDatePicker(false);
+  };
+
+  const cancelDate = () => {
+    setShowDatePicker(false);
   };
   
   const getCategoryIcon = (cat: string) => {
@@ -160,7 +175,7 @@ export default function AddExpenseScreen() {
             
               <View style={styles.inputGroup}>
                 <TextInput
-                  label="Amount Spent"
+                  label="Amount Spent (LKR)"
                   placeholder="How much did you spend?"
                   value={amount}
                   onChangeText={setAmount}
@@ -168,7 +183,7 @@ export default function AddExpenseScreen() {
                   keyboardType="decimal-pad"
                   error={!!amountError}
                   mode="outlined"
-                  left={<TextInput.Icon icon="currency-usd" />}
+                  left={<TextInput.Icon icon="cash" />}
                   outlineStyle={{ borderRadius: 12 }}
                   activeOutlineColor="#4568DC"
                 />
@@ -230,27 +245,81 @@ export default function AddExpenseScreen() {
               <Divider style={styles.divider} />
               
               <View style={styles.datePickerContainer}>
-                <TextInput
-                  label="Date of Expense"
-                  value={format(date, 'MMMM dd, yyyy')}
-                  style={styles.input}
-                  editable={false}
-                  mode="outlined"
-                  left={<TextInput.Icon icon="calendar" />}
-                  right={<TextInput.Icon icon="calendar-edit" onPress={() => setShowDatePicker(true)} />}
-                  outlineStyle={{ borderRadius: 12 }}
-                  activeOutlineColor="#4568DC"
-                />
-                
-                {showDatePicker && (
-                  <DateTimePicker
-                    value={date}
-                    mode="date"
-                    display="default"
-                    onChange={onDateChange}
-                    maximumDate={new Date()}
+                <TouchableOpacity onPress={() => setShowDatePicker(true)}>
+                  <TextInput
+                    label="Date of Expense"
+                    value={format(date, 'MMMM dd, yyyy')}
+                    style={styles.input}
+                    editable={false}
+                    mode="outlined"
+                    left={<TextInput.Icon icon="calendar" />}
+                    right={<TextInput.Icon icon="calendar-edit" />}
+                    outlineStyle={{ borderRadius: 12 }}
+                    activeOutlineColor="#4568DC"
+                    pointerEvents="none"
                   />
-                )}
+                </TouchableOpacity>
+                
+                {/* Enhanced Calendar Modal */}
+                <Modal
+                  visible={showDatePicker}
+                  transparent={true}
+                  animationType="slide"
+                  onRequestClose={cancelDate}
+                >
+                  <View style={styles.modalOverlay}>
+                    <View style={styles.calendarModalContent}>
+                      <View style={styles.calendarModalHeader}>
+                        <Text style={styles.calendarModalTitle}>Select Expense Date</Text>
+                        <IconButton
+                          icon="close"
+                          size={24}
+                          onPress={cancelDate}
+                          iconColor="#666"
+                        />
+                      </View>
+                      
+                      <View style={styles.calendarContainer}>
+                        <View style={styles.selectedDateDisplay}>
+                          <MaterialCommunityIcons name="calendar-check" size={24} color="#4568DC" />
+                          <Text style={styles.selectedDateText}>
+                            {format(date, 'EEEE, MMMM dd, yyyy')}
+                          </Text>
+                        </View>
+                        
+                        <DateTimePicker
+                          value={date}
+                          mode="date"
+                          display={Platform.OS === 'ios' ? 'compact' : 'calendar'}
+                          onChange={onDateChange}
+                          maximumDate={new Date()}
+                          style={styles.enhancedDatePicker}
+                          themeVariant="light"
+                        />
+                      </View>
+                      
+                      <View style={styles.calendarModalActions}>
+                        <Button
+                          mode="outlined"
+                          onPress={cancelDate}
+                          style={styles.calendarModalButton}
+                          labelStyle={{ fontSize: 16 }}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          mode="contained"
+                          onPress={confirmDate}
+                          style={styles.calendarModalButton}
+                          buttonColor="#4568DC"
+                          labelStyle={{ fontSize: 16 }}
+                        >
+                          Confirm
+                        </Button>
+                      </View>
+                    </View>
+                  </View>
+                </Modal>
               </View>
               
               <TextInput
@@ -442,6 +511,130 @@ const styles = StyleSheet.create({
   },
   datePickerContainer: {
     marginBottom: 16,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  calendarModalContent: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 0,
+    width: '100%',
+    maxWidth: 400,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 5,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+  },
+  calendarModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+    backgroundColor: '#F8F9FA',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  calendarModalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#4568DC',
+  },
+  calendarContainer: {
+    padding: 20,
+    backgroundColor: '#FFFFFF',
+  },
+  selectedDateDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 15,
+    backgroundColor: '#F8F9FF',
+    borderRadius: 12,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#E3E7FF',
+  },
+  selectedDateText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#4568DC',
+    marginLeft: 8,
+  },
+  enhancedDatePicker: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    minHeight: Platform.OS === 'android' ? 200 : 150,
+  },
+  calendar: {
+    borderRadius: 15,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  calendarModalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 20,
+    backgroundColor: '#F8F9FA',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    gap: 12,
+  },
+  calendarModalButton: {
+    flex: 1,
+    borderRadius: 12,
+    elevation: 2,
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    minHeight: 350,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  datePickerStyle: {
+    height: 200,
+    marginVertical: 20,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+    gap: 12,
+  },
+  modalButton: {
+    flex: 1,
+    borderRadius: 12,
   },
   buttonContainer: {
     padding: 16,

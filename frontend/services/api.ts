@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { format } from 'date-fns';
-import { Platform, Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 
 // Define the base URL for your API based on the platform
 const getApiUrl = () => {
@@ -90,7 +90,8 @@ export const api = {
       const response = await axiosInstance.get('/expenses');
       return response.data;
     } catch (error) {
-      return handleApiError(error, 'Failed to load expenses');
+      handleApiError(error, 'Failed to load expenses');
+      return []; // Return empty array on error
     }
   },
 
@@ -100,40 +101,41 @@ export const api = {
       const response = await axiosInstance.get(`/expenses/${id}`);
       return response.data;
     } catch (error) {
-      return handleApiError(error, `Failed to load expense details`);
+      handleApiError(error, `Failed to load expense details`);
+      return null; // Return null on error
     }
   },
 
   // Create a new expense
   createExpense: async (expense: Expense) => {
     try {
-      const response = await axios.post(`${API_URL}/expenses`, expense);
+      const response = await axiosInstance.post('/expenses', expense);
       return response.data;
     } catch (error) {
-      console.error('Error creating expense:', error);
-      throw error;
+      handleApiError(error, 'Failed to create expense');
+      return null; // Return null on error
     }
   },
 
   // Update an expense
   updateExpense: async (id: string, expense: Expense) => {
     try {
-      const response = await axios.put(`${API_URL}/expenses/${id}`, expense);
+      const response = await axiosInstance.put(`/expenses/${id}`, expense);
       return response.data;
     } catch (error) {
-      console.error(`Error updating expense with id ${id}:`, error);
-      throw error;
+      handleApiError(error, `Failed to update expense`);
+      return null; // Return null on error
     }
   },
 
   // Delete an expense
   deleteExpense: async (id: string) => {
     try {
-      await axios.delete(`${API_URL}/expenses/${id}`);
+      await axiosInstance.delete(`/expenses/${id}`);
       return true;
     } catch (error) {
-      console.error(`Error deleting expense with id ${id}:`, error);
-      throw error;
+      handleApiError(error, `Failed to delete expense`);
+      return false; // Return false on error
     }
   },
 
@@ -142,24 +144,24 @@ export const api = {
     try {
       const formattedStartDate = format(startDate, 'yyyy-MM-dd');
       const formattedEndDate = format(endDate, 'yyyy-MM-dd');
-      const response = await axios.get(
-        `${API_URL}/expenses/byDate?startDate=${formattedStartDate}&endDate=${formattedEndDate}`
+      const response = await axiosInstance.get(
+        `/expenses/byDate?startDate=${formattedStartDate}&endDate=${formattedEndDate}`
       );
       return response.data;
     } catch (error) {
-      console.error('Error fetching expenses by date range:', error);
-      throw error;
+      handleApiError(error, 'Failed to fetch expenses by date range');
+      return []; // Return empty array on error
     }
   },
 
   // Get expenses by category
   getExpensesByCategory: async (category: string) => {
     try {
-      const response = await axios.get(`${API_URL}/expenses/byCategory?category=${category}`);
+      const response = await axiosInstance.get(`/expenses/byCategory?category=${category}`);
       return response.data;
     } catch (error) {
-      console.error(`Error fetching expenses for category ${category}:`, error);
-      throw error;
+      handleApiError(error, `Failed to fetch expenses for category ${category}`);
+      return []; // Return empty array on error
     }
   },
 
@@ -168,13 +170,13 @@ export const api = {
     try {
       const formattedStartDate = format(startDate, 'yyyy-MM-dd');
       const formattedEndDate = format(endDate, 'yyyy-MM-dd');
-      const response = await axios.get(
-        `${API_URL}/expenses/summary?startDate=${formattedStartDate}&endDate=${formattedEndDate}`
+      const response = await axiosInstance.get(
+        `/expenses/summary?startDate=${formattedStartDate}&endDate=${formattedEndDate}`
       );
       return response.data as ExpenseSummary;
     } catch (error) {
-      console.error('Error fetching expense summary:', error);
-      throw error;
+      handleApiError(error, 'Failed to fetch expense summary');
+      return {} as ExpenseSummary; // Return empty object on error
     }
   }
 };
