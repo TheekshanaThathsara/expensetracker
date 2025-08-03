@@ -1,10 +1,10 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { format } from 'date-fns';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Modal, Platform, ScrollView, StatusBar, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Calendar } from 'react-native-calendars';
 import { Button, Card, Divider, HelperText, IconButton, Text, TextInput, useTheme } from 'react-native-paper';
 
 import { CATEGORY_COLORS, CATEGORY_ICONS, EXPENSE_CATEGORIES } from '@/constants/ExpenseCategories';
@@ -66,7 +66,8 @@ export default function AddExpenseScreen() {
     if (validateInputs()) {
       try {
         setLoading(true);
-        await api.createExpense({
+        
+        console.log('Submitting expense with data:', {
           title: title.trim(),
           amount: parseFloat(amount),
           category,
@@ -74,8 +75,32 @@ export default function AddExpenseScreen() {
           notes: notes.trim()
         });
         
-        // Navigate back to expenses list
-        router.replace('/');
+        const result = await api.createExpense({
+          title: title.trim(),
+          amount: parseFloat(amount),
+          category,
+          date: format(date, 'yyyy-MM-dd'),
+          notes: notes.trim()
+        });
+        
+        if (result) {
+          console.log('Expense created successfully:', result);
+          
+          // Show success feedback
+          console.log('✅ Expense saved! Reports will auto-refresh.');
+          
+          // Reset form
+          setTitle('');
+          setAmount('');
+          setCategory('');
+          setNotes('');
+          setDate(new Date());
+          
+          // Navigate back to expenses list - the useFocusEffect in reports will auto-refresh
+          router.replace('/');
+        } else {
+          console.error('Failed to create expense - no result returned');
+        }
       } catch (error) {
         console.error('Error saving expense:', error);
       } finally {
@@ -91,13 +116,6 @@ export default function AddExpenseScreen() {
     if (selectedDate) {
       setDate(selectedDate);
     }
-  };
-
-  // Handle calendar date selection
-  const onCalendarDateSelect = (day: any) => {
-    const selectedDate = new Date(day.dateString);
-    setDate(selectedDate);
-    setShowDatePicker(false);
   };
 
   const confirmDate = () => {
@@ -248,7 +266,7 @@ export default function AddExpenseScreen() {
                 <TouchableOpacity onPress={() => setShowDatePicker(true)}>
                   <TextInput
                     label="Date of Expense"
-                    value={format(date, 'MMMM dd, yyyy')}
+                    value={format(date, 'EEEE, MMMM dd, yyyy')}
                     style={styles.input}
                     editable={false}
                     mode="outlined"
@@ -281,20 +299,101 @@ export default function AddExpenseScreen() {
                       
                       <View style={styles.calendarContainer}>
                         <View style={styles.selectedDateDisplay}>
-                          <MaterialCommunityIcons name="calendar-check" size={24} color="#4568DC" />
+                          <MaterialCommunityIcons name="calendar-today" size={24} color="#4568DC" />
                           <Text style={styles.selectedDateText}>
                             {format(date, 'EEEE, MMMM dd, yyyy')}
                           </Text>
                         </View>
                         
-                        <DateTimePicker
-                          value={date}
-                          mode="date"
-                          display={Platform.OS === 'ios' ? 'compact' : 'calendar'}
-                          onChange={onDateChange}
-                          maximumDate={new Date()}
-                          style={styles.enhancedDatePicker}
-                          themeVariant="light"
+                        {/* Quick Date Selection */}
+                        <View style={styles.quickDateSelection}>
+                          <TouchableOpacity 
+                            style={[
+                              styles.quickDateButton, 
+                              format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd') && styles.quickDateButtonActive
+                            ]}
+                            onPress={() => setDate(new Date())}
+                          >
+                            <MaterialCommunityIcons name="calendar-today" size={16} color="#4568DC" />
+                            <Text style={[
+                              styles.quickDateText,
+                              format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd') && styles.quickDateTextActive
+                            ]}>Today</Text>
+                          </TouchableOpacity>
+                          
+                          <TouchableOpacity 
+                            style={[
+                              styles.quickDateButton,
+                              format(date, 'yyyy-MM-dd') === format(new Date(Date.now() - 24 * 60 * 60 * 1000), 'yyyy-MM-dd') && styles.quickDateButtonActive
+                            ]}
+                            onPress={() => setDate(new Date(Date.now() - 24 * 60 * 60 * 1000))}
+                          >
+                            <MaterialCommunityIcons name="calendar-minus" size={16} color="#4568DC" />
+                            <Text style={[
+                              styles.quickDateText,
+                              format(date, 'yyyy-MM-dd') === format(new Date(Date.now() - 24 * 60 * 60 * 1000), 'yyyy-MM-dd') && styles.quickDateTextActive
+                            ]}>Yesterday</Text>
+                          </TouchableOpacity>
+                          
+                          <TouchableOpacity 
+                            style={[
+                              styles.quickDateButton,
+                              format(date, 'yyyy-MM-dd') === format(new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd') && styles.quickDateButtonActive
+                            ]}
+                            onPress={() => setDate(new Date(Date.now() - 2 * 24 * 60 * 60 * 1000))}
+                          >
+                            <MaterialCommunityIcons name="calendar-minus" size={16} color="#4568DC" />
+                            <Text style={[
+                              styles.quickDateText,
+                              format(date, 'yyyy-MM-dd') === format(new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd') && styles.quickDateTextActive
+                            ]}>2 Days Ago</Text>
+                          </TouchableOpacity>
+                        </View>
+                        
+                        {/* Calendar Component */}
+                        <Calendar
+                          current={format(date, 'yyyy-MM-dd')}
+                          onDayPress={(day) => {
+                            setDate(new Date(day.dateString));
+                          }}
+                          maxDate={format(new Date(), 'yyyy-MM-dd')}
+                          enableSwipeMonths={true}
+                          theme={{
+                            backgroundColor: '#ffffff',
+                            calendarBackground: '#ffffff',
+                            textSectionTitleColor: '#b6c1cd',
+                            selectedDayBackgroundColor: '#4568DC',
+                            selectedDayTextColor: '#ffffff',
+                            todayTextColor: '#4568DC',
+                            dayTextColor: '#2d4150',
+                            textDisabledColor: '#d9e1e8',
+                            dotColor: '#4568DC',
+                            selectedDotColor: '#ffffff',
+                            arrowColor: '#4568DC',
+                            monthTextColor: '#4568DC',
+                            indicatorColor: '#4568DC',
+                            textDayFontFamily: 'System',
+                            textMonthFontFamily: 'System',
+                            textDayHeaderFontFamily: 'System',
+                            textDayFontWeight: '400',
+                            textMonthFontWeight: 'bold',
+                            textDayHeaderFontWeight: '600',
+                            textDayFontSize: 16,
+                            textMonthFontSize: 18,
+                            textDayHeaderFontSize: 14
+                          }}
+                          style={styles.calendar}
+                          markedDates={{
+                            [format(date, 'yyyy-MM-dd')]: {
+                              selected: true,
+                              selectedColor: '#4568DC',
+                              selectedTextColor: '#ffffff'
+                            },
+                            [format(new Date(), 'yyyy-MM-dd')]: {
+                              marked: true,
+                              dotColor: '#4568DC'
+                            }
+                          }}
                         />
                       </View>
                       
@@ -314,7 +413,7 @@ export default function AddExpenseScreen() {
                           buttonColor="#4568DC"
                           labelStyle={{ fontSize: 16 }}
                         >
-                          Confirm
+                          Confirm Date
                         </Button>
                       </View>
                     </View>
@@ -571,6 +670,40 @@ const styles = StyleSheet.create({
     color: '#4568DC',
     marginLeft: 8,
   },
+  quickDateSelection: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 20,
+    flexWrap: 'wrap',
+  },
+  quickDateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E3E7FF',
+    backgroundColor: '#FFFFFF',
+    gap: 4,
+    minWidth: 90,
+  },
+  quickDateButtonActive: {
+    backgroundColor: '#E3E7FF',
+    borderColor: '#4568DC',
+  },
+  quickDateText: {
+    fontSize: 12,
+    color: '#4568DC',
+    fontWeight: '500',
+    textAlign: 'center',
+    flex: 1,
+  },
+  quickDateTextActive: {
+    color: '#4568DC',
+    fontWeight: '600',
+  },
   enhancedDatePicker: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
@@ -586,6 +719,8 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    marginVertical: 10,
+    paddingBottom: 10,
   },
   calendarModalActions: {
     flexDirection: 'row',
