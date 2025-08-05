@@ -380,7 +380,7 @@ export default function ReportsScreen() {
                   <Text style={styles.emptyText}>Add some expenses to see your spending report.</Text>
                   <Button 
                     mode="contained" 
-                    onPress={() => router.push('/(tabs)/add-expense')}
+                    onPress={() => router.push('/(tabs)/add-expense' as any)}
                     style={styles.addButton}
                     icon="plus"
                   >

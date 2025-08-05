@@ -119,11 +119,11 @@ export default function ReportsScreen() {
       console.log('Reports screen focused, refreshing data...');
       console.log('Current state - dateRange:', dateRange, 'startDate:', startDate, 'endDate:', endDate);
       setShowRefreshTime(true);
-      // Small delay to ensure any pending API calls from expense creation are complete
+      // Minimal delay to ensure any pending API calls from expense creation are complete
       setTimeout(() => {
         fetchData(true); // Force refresh when screen is focused
         setTimeout(() => setShowRefreshTime(false), 2000); // Hide after 2 seconds
-      }, 500);
+      }, 200); // Reduced from 500ms to 200ms for faster refresh
     }, [dateRange]) // Only depend on dateRange to avoid stale closures with dates
   );
 
@@ -200,10 +200,10 @@ export default function ReportsScreen() {
       console.log('End date:', endDate.toISOString());
       console.log('Date range span:', Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)), 'days');
       
-      // If this is a force refresh (after adding expense), add a longer delay to ensure database consistency
+      // If this is a force refresh (after adding expense), add a small delay to ensure database consistency
       if (forceRefresh) {
-        console.log('🔄 Force refresh detected - waiting for database sync...');
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second for DB consistency
+        console.log('🔄 Force refresh detected - brief wait for database sync...');
+        await new Promise(resolve => setTimeout(resolve, 500)); // Reduced from 1 second to 500ms
       }
       
       // Debug current week calculation
@@ -221,10 +221,37 @@ export default function ReportsScreen() {
         console.log('Request end date:', endDate.toISOString());
       }
       
-      let data = await api.getExpenseSummary(startDate, endDate);
-      let expensesData = await api.getExpensesByDateRange(startDate, endDate);
+      // Always use comprehensive data fetching strategy for consistent results
+      console.log('🔍 COMPREHENSIVE DATA FETCH STRATEGY:');
+      console.log('Fetching all expenses for comprehensive filtering...');
       
-      console.log('🔍 API RESPONSE DEBUG:');
+      // Fetch all expenses first for comprehensive data
+      const allExpensesResponse = await api.getExpensesByDateRange(
+        new Date('2020-01-01'), // Very old start date
+        new Date(new Date().getTime() + 24 * 60 * 60 * 1000) // Tomorrow
+      );
+      
+      console.log('All expenses fetched:', allExpensesResponse.length);
+      
+      // Filter for the specific date range
+      let expensesData = allExpensesResponse.filter((expense: any) => {
+        const expenseDate = new Date(expense.date);
+        return expenseDate >= startDate && expenseDate <= endDate;
+      });
+      
+      console.log('Expenses filtered for date range:', expensesData.length);
+      
+      // Generate summary from filtered expenses
+      let data: ExpenseSummary = {};
+      expensesData.forEach((expense: any) => {
+        if (data[expense.category]) {
+          data[expense.category] += expense.amount;
+        } else {
+          data[expense.category] = expense.amount;
+        }
+      });
+      
+      console.log('🔍 COMPREHENSIVE API RESPONSE DEBUG:');
       console.log('API called with start date:', startDate.toISOString(), '(', format(startDate, 'yyyy-MM-dd HH:mm:ss'), ')');
       console.log('API called with end date:', endDate.toISOString(), '(', format(endDate, 'yyyy-MM-dd HH:mm:ss'), ')');
       console.log('Summary data keys:', Object.keys(data));
@@ -242,348 +269,77 @@ export default function ReportsScreen() {
       
       // If we're in month view, log all expenses with their dates for debugging
       if (dateRange === 'month') {
-        console.log('🗓️ MONTH VIEW - All expenses returned by API:');
+        console.log('🗓️ MONTH VIEW - All expenses returned by comprehensive fetch:');
         expensesData.forEach((expense: any, index: number) => {
           console.log(`${index + 1}. ${format(new Date(expense.date), 'yyyy-MM-dd')} - ${expense.amount} LKR (${expense.category}) - ${expense.title || 'No title'}`);
         });
       }
       
-      // If force refresh and we still have stale data, try fetching with a broader range and filter
-      if (forceRefresh) {
-        console.log('🔄 Force refresh: Always trying broader date range for better data consistency...');
-        const broadStartDate = new Date(startDate.getTime() - 30 * 24 * 60 * 60 * 1000); // 30 days before
-        const broadEndDate = new Date(endDate.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days after
-        
-        console.log('🔄 Fetching broader range:', format(broadStartDate, 'yyyy-MM-dd'), 'to', format(broadEndDate, 'yyyy-MM-dd'));
-        const broadExpensesData = await api.getExpensesByDateRange(broadStartDate, broadEndDate);
-        const broadSummaryData = await api.getExpenseSummary(broadStartDate, broadEndDate);
-        console.log('🔄 Broader range returned:', broadExpensesData.length, 'expenses');
-        console.log('🔄 Broader summary data:', Object.keys(broadSummaryData).length, 'categories');
-        
-        // Filter to original date range
-        const filteredExpenses = broadExpensesData.filter((expense: any) => {
+      // Apply specific filtering based on date range type for extra precision
+      if (dateRange === 'day') {
+        console.log('Day tab - filtering for selected day:', format(currentDay, 'yyyy-MM-dd'));
+        expensesData = expensesData.filter((expense: any) => {
           const expenseDate = new Date(expense.date);
-          return expenseDate >= startDate && expenseDate <= endDate;
+          const selectedDate = new Date(currentDay);
+          
+          // Compare dates only (year, month, day) - ignore time
+          const expenseDateStr = format(expenseDate, 'yyyy-MM-dd');
+          const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
+          
+          return expenseDateStr === selectedDateStr;
         });
         
-        console.log('🔄 Filtered back to original range:', filteredExpenses.length, 'expenses');
-        console.log('🔄 Original API returned:', expensesData.length, 'expenses');
+        // Recalculate summary for day
+        data = {};
+        expensesData.forEach((expense: any) => {
+          data[expense.category] = (data[expense.category] || 0) + expense.amount;
+        });
         
-        // Use broader data if it gives us more relevant results
-        if (filteredExpenses.length >= expensesData.length) {
-          console.log('🔄 Using broader range data as it has more/equal relevant expenses');
-          expensesData = filteredExpenses;
+        console.log('Day expenses after filtering:', expensesData.length);
+      } else if (dateRange === 'week') {
+        console.log('Week tab - filtering for selected week:', format(startDate, 'MMM dd'), '-', format(endDate, 'MMM dd, yyyy'));
+        // Week filtering is already done by date range, but ensure precision
+        expensesData = expensesData.filter((expense: any) => {
+          const expenseDate = new Date(expense.date);
+          const expenseDateStart = new Date(expenseDate.getFullYear(), expenseDate.getMonth(), expenseDate.getDate());
+          const startDateStart = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+          const endDateStart = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
           
-          // Recalculate summary from filtered expenses
-          const recalculatedSummary: ExpenseSummary = {};
-          filteredExpenses.forEach((expense: any) => {
-            if (recalculatedSummary[expense.category]) {
-              recalculatedSummary[expense.category] += expense.amount;
-            } else {
-              recalculatedSummary[expense.category] = expense.amount;
-            }
-          });
-          data = recalculatedSummary;
-          console.log('🔄 Recalculated summary from filtered expenses:', data);
-        } else {
-          console.log('🔄 Keeping original API data as it seems more complete');
-        }
+          return expenseDateStart >= startDateStart && expenseDateStart <= endDateStart;
+        });
+        
+        // Recalculate summary for week
+        data = {};
+        expensesData.forEach((expense: any) => {
+          data[expense.category] = (data[expense.category] || 0) + expense.amount;
+        });
+        
+        console.log('Week expenses after filtering:', expensesData.length);
+      } else if (dateRange === 'month') {
+        console.log('Month tab - filtering for selected month:', format(currentMonth, 'MMM yyyy'));
+        expensesData = expensesData.filter((expense: any) => {
+          const expenseDate = new Date(expense.date);
+          return expenseDate.getFullYear() === currentMonth.getFullYear() && 
+                 expenseDate.getMonth() === currentMonth.getMonth();
+        });
+        
+        // Recalculate summary for month
+        data = {};
+        expensesData.forEach((expense: any) => {
+          data[expense.category] = (data[expense.category] || 0) + expense.amount;
+        });
+        
+        console.log('Month expenses after filtering:', expensesData.length);
       }
       
-      // For week view specifically, let's debug what we're getting from API
+      // Debug logging for specific date ranges
       if (dateRange === 'week') {
-        console.log('🗓️ WEEK API DEBUG:');
+        console.log('🗓️ WEEK DEBUG:');
         console.log('Requested week range:', format(startDate, 'yyyy-MM-dd'), 'to', format(endDate, 'yyyy-MM-dd'));
-        console.log('Received expenses for week:', expensesData.length);
+        console.log('Final week expenses:', expensesData.length);
         expensesData.forEach((expense: any, index: number) => {
           console.log(`Week expense ${index + 1}: ${expense.date} - ${formatCurrency(expense.amount)} (${expense.category})`);
         });
-      }
-      
-      // For day tab, ensure we get the correct data for the selected day
-      if (dateRange === 'day') {
-        console.log('Day tab - processing data for selected day:', format(currentDay, 'yyyy-MM-dd'));
-        console.log('Day tab - API returned:', expensesData.length, 'expenses');
-        
-        // If no expenses found from API, try fetching a broader range (current month) and filter manually
-        if (expensesData.length === 0) {
-          console.log('No expenses from API for selected day, fetching current month to double-check...');
-          const monthStart = startOfMonth(currentDay);
-          const monthEnd = endOfMonth(currentDay);
-          
-          const monthExpensesResponse = await api.getExpensesByDateRange(monthStart, monthEnd);
-          console.log('Month expenses fetched for day check:', monthExpensesResponse.length);
-          
-          // Filter for the specific selected day
-          const dayExpenses = monthExpensesResponse.filter((expense: any) => {
-            const expenseDate = new Date(expense.date);
-            const selectedDate = new Date(currentDay);
-            
-            // Compare dates only (year, month, day) - ignore time
-            const expenseDateStr = format(expenseDate, 'yyyy-MM-dd');
-            const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
-            
-            return expenseDateStr === selectedDateStr;
-          });
-          
-          console.log(`Day ${format(currentDay, 'yyyy-MM-dd')} expenses found in month data:`, dayExpenses.length);
-          
-          if (dayExpenses.length > 0) {
-            console.log('Found day expenses in month data, using them instead');
-            expensesData = dayExpenses;
-            
-            // Recalculate summary for selected day expenses
-            const daySummary: ExpenseSummary = {};
-            dayExpenses.forEach((expense: any) => {
-              if (daySummary[expense.category]) {
-                daySummary[expense.category] += expense.amount;
-              } else {
-                daySummary[expense.category] = expense.amount;
-              }
-            });
-            data = daySummary;
-            console.log('Recalculated summary for selected day:', data);
-          } else {
-            console.log('No expenses found for selected day even in month data');
-          }
-        } else {
-          // Even if API returned data, filter it to make sure it's only for the selected day
-          const dayExpenses = expensesData.filter((expense: any) => {
-            const expenseDate = new Date(expense.date);
-            const selectedDate = new Date(currentDay);
-            
-            // Compare dates only (year, month, day) - ignore time
-            const expenseDateStr = format(expenseDate, 'yyyy-MM-dd');
-            const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
-            
-            return expenseDateStr === selectedDateStr;
-          });
-          
-          console.log(`Filtering API data: ${expensesData.length} -> ${dayExpenses.length} for day ${format(currentDay, 'yyyy-MM-dd')}`);
-          
-          if (dayExpenses.length !== expensesData.length) {
-            console.log('API returned mixed date data, filtering to selected day only');
-            expensesData = dayExpenses;
-            
-            // Recalculate summary for selected day expenses
-            const daySummary: ExpenseSummary = {};
-            dayExpenses.forEach((expense: any) => {
-              if (daySummary[expense.category]) {
-                daySummary[expense.category] += expense.amount;
-              } else {
-                daySummary[expense.category] = expense.amount;
-              }
-            });
-            data = daySummary;
-            console.log('Filtered and recalculated summary for selected day:', data);
-          }
-        }
-      }
-      
-      // For week tab, show data for the specific selected week only
-      // Always check if we need to fetch all data and filter manually for better accuracy
-      if (dateRange === 'week') {
-        console.log('Week tab - showing data for selected week:', format(startDate, 'MMM dd'), '-', format(endDate, 'MMM dd, yyyy'));
-        console.log('Week expenses found:', expensesData.length);
-        
-        // Check if this is the current week
-        const currentWeek = startOfWeek(new Date(), { weekStartsOn: 1 });
-        const selectedWeek = startOfWeek(currentWeekStart, { weekStartsOn: 1 });
-        const isCurrentWeek = format(currentWeek, 'yyyy-MM-dd') === format(selectedWeek, 'yyyy-MM-dd');
-        
-        console.log('Is this the current week?', isCurrentWeek);
-        
-        // For current week or force refresh, always try fetching all data for better accuracy
-        if ((isCurrentWeek || forceRefresh) && (expensesData.length === 0 || forceRefresh)) {
-          console.log('Week tab: Fetching all expenses for accurate filtering...');
-          const allExpensesResponse = await api.getExpensesByDateRange(
-            new Date('2020-01-01'), // Very old start date
-            new Date(new Date().getTime() + 24 * 60 * 60 * 1000) // Tomorrow
-          );
-          
-          console.log('All expenses fetched for week filtering:', allExpensesResponse.length);
-          
-          // Filter for selected week manually with precise date matching
-          const weekExpenses = allExpensesResponse.filter((expense: any) => {
-            const expenseDate = new Date(expense.date);
-            const weekStart = startOfWeek(currentWeekStart, { weekStartsOn: 1 });
-            const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
-            
-            // Convert to date-only for precise comparison
-            const expenseDateOnly = new Date(expenseDate.getFullYear(), expenseDate.getMonth(), expenseDate.getDate());
-            const weekStartOnly = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate());
-            const weekEndOnly = new Date(weekEnd.getFullYear(), weekEnd.getMonth(), weekEnd.getDate());
-            
-            const isInWeek = expenseDateOnly >= weekStartOnly && expenseDateOnly <= weekEndOnly;
-            
-            if (isInWeek) {
-              console.log(`✅ Week expense found: ${format(expenseDate, 'yyyy-MM-dd')} - ${expense.amount} (${expense.category})`);
-            }
-            
-            return isInWeek;
-          });
-          
-          console.log('Week expenses found in all data:', weekExpenses.length);
-          
-          if (weekExpenses.length > expensesData.length) {
-            console.log('Found more week expenses in all data, using them instead');
-            expensesData = weekExpenses;
-            
-            // Recalculate summary for week expenses
-            const weekSummary: ExpenseSummary = {};
-            weekExpenses.forEach((expense: any) => {
-              if (weekSummary[expense.category]) {
-                weekSummary[expense.category] += expense.amount;
-              } else {
-                weekSummary[expense.category] = expense.amount;
-              }
-            });
-            data = weekSummary;
-            console.log('Recalculated summary for week:', data);
-          }
-        }
-      }
-      
-      // For month tab, show data for the specific selected month only
-      if (dateRange === 'month') {
-        console.log('Month tab - showing data for selected month:', format(currentMonth, 'MMM yyyy'));
-        console.log('Month expenses found from API:', expensesData.length);
-        
-        // Check if this is the current month
-        const thisMonth = new Date();
-        const isCurrentMonth = thisMonth.getFullYear() === currentMonth.getFullYear() && 
-                               thisMonth.getMonth() === currentMonth.getMonth();
-        
-        console.log('Is this the current month?', isCurrentMonth);
-        console.log('API date range was:', format(startDate, 'yyyy-MM-dd'), 'to', format(endDate, 'yyyy-MM-dd'));
-        
-        // Check if we're missing early days of the month (like August 1st, 2nd)
-        const today = new Date();
-        const currentDay = today.getDate();
-        const hasEarlyDaysData = expensesData.some((expense: any) => {
-          const expenseDate = new Date(expense.date);
-          const expenseDay = expenseDate.getDate();
-          return expenseDay <= 2 && isCurrentMonth; // Check for 1st and 2nd if current month
-        });
-        
-        console.log('Current day of month:', currentDay);
-        console.log('Has early days (1st-2nd) data:', hasEarlyDaysData);
-        console.log('Should check for missing early days:', isCurrentMonth && currentDay >= 3 && !hasEarlyDaysData);
-        
-        // For current month, ALWAYS try getting all data for better accuracy
-        // For other months, only if no data found or force refresh
-        // Also trigger if we suspect missing early days of current month
-        if (isCurrentMonth || forceRefresh || expensesData.length === 0 || 
-            (isCurrentMonth && currentDay >= 3 && !hasEarlyDaysData)) {
-          console.log('Month tab: Fetching all expenses for accurate month filtering...');
-          console.log('Reason: isCurrentMonth =', isCurrentMonth, ', forceRefresh =', forceRefresh, ', expensesData.length =', expensesData.length, ', missing early days =', (isCurrentMonth && currentDay >= 3 && !hasEarlyDaysData));
-          
-          const allExpensesResponse = await api.getExpensesByDateRange(
-            new Date('2020-01-01'), // Very old start date
-            new Date(new Date().getTime() + 24 * 60 * 60 * 1000) // Tomorrow
-          );
-          
-          console.log('All expenses fetched for month filtering:', allExpensesResponse.length);
-          
-          // Filter for selected month manually with precise date matching
-          const monthExpenses = allExpensesResponse.filter((expense: any) => {
-            const expenseDate = new Date(expense.date);
-            const isInMonth = expenseDate.getFullYear() === currentMonth.getFullYear() && 
-                             expenseDate.getMonth() === currentMonth.getMonth();
-            
-            if (isInMonth) {
-              console.log(`✅ Month expense found: ${format(expenseDate, 'yyyy-MM-dd')} - ${expense.amount} (${expense.category})`);
-            }
-            
-            return isInMonth;
-          });
-          
-          console.log(`Month ${format(currentMonth, 'MMM yyyy')} expenses found in all data:`, monthExpenses.length);
-          
-          // For current month, always use the comprehensive data
-          // For other months, use it only if it gives us more data
-          if (isCurrentMonth || monthExpenses.length >= expensesData.length) {
-            console.log('Using comprehensive month data (isCurrentMonth:', isCurrentMonth, ', comprehensive data count:', monthExpenses.length, ', original:', expensesData.length, ')');
-            expensesData = monthExpenses;
-            
-            // Recalculate summary for selected month expenses
-            const monthSummary: ExpenseSummary = {};
-            monthExpenses.forEach((expense: any) => {
-              if (monthSummary[expense.category]) {
-                monthSummary[expense.category] += expense.amount;
-              } else {
-                monthSummary[expense.category] = expense.amount;
-              }
-            });
-            data = monthSummary;
-            console.log('Recalculated summary for selected month:', data);
-          } else {
-            console.log('Keeping original API data as it has more expenses');
-          }
-        } else {
-          // Filter expenses to only include those from the selected month (even if from original API)
-          const monthExpenses = expensesData.filter((expense: any) => {
-            const expenseDate = new Date(expense.date);
-            const isInMonth = expenseDate.getFullYear() === currentMonth.getFullYear() && 
-                             expenseDate.getMonth() === currentMonth.getMonth();
-            
-            if (isInMonth) {
-              console.log(`✅ Month expense from API: ${format(expenseDate, 'yyyy-MM-dd')} - ${expense.amount} (${expense.category})`);
-            } else {
-              console.log(`❌ Month expense excluded: ${format(expenseDate, 'yyyy-MM-dd')} not in ${format(currentMonth, 'MMM yyyy')}`);
-            }
-            
-            return isInMonth;
-          });
-          
-          console.log(`Month ${format(currentMonth, 'MMM yyyy')} expenses filtered from API:`, monthExpenses.length);
-          
-          if (monthExpenses.length !== expensesData.length) {
-            console.log('Filtering month expenses to match selected month');
-            expensesData = monthExpenses;
-            
-            // Recalculate summary for selected month expenses
-            const monthSummary: ExpenseSummary = {};
-            monthExpenses.forEach((expense: any) => {
-              if (monthSummary[expense.category]) {
-                monthSummary[expense.category] += expense.amount;
-              } else {
-                monthSummary[expense.category] = expense.amount;
-              }
-            });
-            data = monthSummary;
-            console.log('Recalculated summary for selected month:', data);
-          }
-        }
-      }
-      
-      // For all tab, if no expenses found for last 30 days, fetch all expenses
-      if (dateRange === 'all' && expensesData.length === 0) {
-        console.log('No expenses found for last 30 days, fetching all expenses for all view...');
-        // Get all expenses without date restriction for all view
-        const allExpensesResponse = await api.getExpensesByDateRange(
-          new Date('2020-01-01'), // Very old start date
-          new Date(new Date().getTime() + 24 * 60 * 60 * 1000) // Tomorrow
-        );
-        
-        if (allExpensesResponse.length > 0) {
-          // Get the most recent expenses for all view
-          expensesData = allExpensesResponse;
-          
-          // Recalculate summary for all expenses
-          const allSummary: ExpenseSummary = {};
-          allExpensesResponse.forEach((expense: Expense) => {
-            if (allSummary[expense.category]) {
-              allSummary[expense.category] += expense.amount;
-            } else {
-              allSummary[expense.category] = expense.amount;
-            }
-          });
-          data = allSummary;
-          
-          console.log('Using all expenses for all view:', allExpensesResponse.length);
-          console.log('Recalculated summary:', data);
-        }
       }
       
       setSummary(data);
@@ -1429,20 +1185,6 @@ export default function ReportsScreen() {
               {renderDateRangeText()}
             </Chip>
             
-            {/* Debug refresh button */}
-            <Button 
-              mode="outlined" 
-              onPress={() => {
-                console.log('Manual refresh triggered');
-                fetchData(true); // Force refresh for manual refresh
-              }}
-              style={{ marginTop: 10 }}
-              icon="refresh"
-              compact
-            >
-              Refresh Data
-            </Button>
-            
             {/* Debug pagination button for month view */}
             {dateRange === 'month' && (
               <>
@@ -1808,7 +1550,7 @@ export default function ReportsScreen() {
                   <Text style={styles.emptyText}>Add some expenses to see your spending report.</Text>
                   <Button 
                     mode="contained" 
-                    onPress={() => router.push('/(tabs)/add-expense')}
+                    onPress={() => router.push('/(tabs)/add-expense' as any)}
                     style={styles.addButton}
                     icon="plus"
                   >

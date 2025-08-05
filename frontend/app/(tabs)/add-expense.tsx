@@ -97,7 +97,7 @@ export default function AddExpenseScreen() {
           setDate(new Date());
           
           // Navigate back to expenses list - the useFocusEffect in reports will auto-refresh
-          router.replace('/');
+          router.replace('/(tabs)/' as any);
         } else {
           console.error('Failed to create expense - no result returned');
         }

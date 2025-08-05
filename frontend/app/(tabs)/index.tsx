@@ -122,7 +122,7 @@ export default function ExpensesScreen() {
             icon="pencil" 
             mode="text" 
             onPress={() => router.push({
-              pathname: '/expense-detail/[id]',
+              pathname: '/expense-detail/[id]' as any,
               params: { id: item.id || '' }
             })}
           >
@@ -203,7 +203,7 @@ export default function ExpensesScreen() {
               {!searchQuery && (
                 <Button 
                   mode="contained" 
-                  onPress={() => router.push('/add-expense')}
+                  onPress={() => router.push('/(tabs)/add-expense' as any)}
                   style={styles.addButton}
                   icon="plus"
                 >
@@ -219,7 +219,7 @@ export default function ExpensesScreen() {
       <FAB
         icon="plus"
         style={styles.fab}
-        onPress={() => router.push('/(tabs)/add-expense')}
+        onPress={() => router.push('/(tabs)/add-expense' as any)}
         color="#fff"
       />
     </View>
